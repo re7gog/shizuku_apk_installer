@@ -10,6 +10,12 @@ class MockShizukuApkInstallerPlatform
 
   @override
   Future<String?> getPlatformVersion() => Future.value('42');
+
+  @override
+  Future<String?> checkPermission() {
+    // TODO: implement checkPermission
+    throw UnimplementedError();
+  }
 }
 
 void main() {

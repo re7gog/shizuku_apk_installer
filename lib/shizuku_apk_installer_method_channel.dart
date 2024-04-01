@@ -14,4 +14,10 @@ class MethodChannelShizukuApkInstaller extends ShizukuApkInstallerPlatform {
     final version = await methodChannel.invokeMethod<String>('getPlatformVersion');
     return version;
   }
+
+  @override
+  Future<String?> checkPermission() async {
+    final permission = await methodChannel.invokeMethod<String>('checkPermission');
+    return permission;
+  }
 }

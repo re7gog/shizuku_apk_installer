@@ -17,6 +17,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String _platformVersion = 'Unknown';
+  String _permission = 'Not requested yet';
   final _shizukuApkInstallerPlugin = ShizukuApkInstaller();
 
   @override
@@ -47,6 +48,19 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  Future<void> checkPermission() async {
+    String permission;
+    try {
+      permission =
+          await _shizukuApkInstallerPlugin.checkPermission() ?? 'Unknown permission state';
+    } on PlatformException {
+      permission = 'Failed to get permission state.';
+    }
+    setState(() {
+      _permission = permission;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -54,8 +68,15 @@ class _MyAppState extends State<MyApp> {
         appBar: AppBar(
           title: const Text('Plugin example app'),
         ),
-        body: Center(
-          child: Text('Running on: $_platformVersion\n'),
+        body: Column(
+          children: [
+            Text('Running on: $_platformVersion\n'),
+            TextButton(
+                onPressed: checkPermission,
+                child: const Text('Check Shizuku Permission')
+            ),
+            Text(_permission),
+          ]
         ),
       ),
     );

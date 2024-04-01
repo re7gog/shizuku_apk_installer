@@ -26,4 +26,8 @@ abstract class ShizukuApkInstallerPlatform extends PlatformInterface {
   Future<String?> getPlatformVersion() {
     throw UnimplementedError('platformVersion() has not been implemented.');
   }
+
+  Future<String?> checkPermission() {
+    throw UnimplementedError('checkPermission() has not been implemented.');
+  }
 }

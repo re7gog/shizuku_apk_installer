@@ -5,4 +5,7 @@ class ShizukuApkInstaller {
   Future<String?> getPlatformVersion() {
     return ShizukuApkInstallerPlatform.instance.getPlatformVersion();
   }
+  Future<String?> checkPermission() {
+    return ShizukuApkInstallerPlatform.instance.checkPermission();
+  }
 }
