@@ -30,4 +30,8 @@ abstract class ShizukuApkInstallerPlatform extends PlatformInterface {
   Future<String?> checkPermission() {
     throw UnimplementedError('checkPermission() has not been implemented.');
   }
+
+  Future<bool?> installAPKs(List<String> apkFilesURIs) {
+    throw UnimplementedError('installAPKs() has not been implemented.');
+  }
 }

@@ -8,4 +8,7 @@ class ShizukuApkInstaller {
   Future<String?> checkPermission() {
     return ShizukuApkInstallerPlatform.instance.checkPermission();
   }
+  Future<bool?> installAPKs(List<String> apkFilesURIs) {
+    return ShizukuApkInstallerPlatform.instance.installAPKs(apkFilesURIs);
+  }
 }

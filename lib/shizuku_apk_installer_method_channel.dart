@@ -20,4 +20,10 @@ class MethodChannelShizukuApkInstaller extends ShizukuApkInstallerPlatform {
     final permission = await methodChannel.invokeMethod<String>('checkPermission');
     return permission;
   }
+
+  @override
+  Future<bool?> installAPKs(List<String> apkFilesURIs) async {
+    final success = await methodChannel.invokeMethod<bool>('installAPKs', {'apkFilesURIs': apkFilesURIs});
+    return success;
+  }
 }

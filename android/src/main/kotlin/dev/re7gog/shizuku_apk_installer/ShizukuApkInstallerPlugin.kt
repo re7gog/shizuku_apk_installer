@@ -23,7 +23,7 @@ class ShizukuApkInstallerPlugin: FlutterPlugin, MethodCallHandler {
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     channel = MethodChannel(flutterPluginBinding.binaryMessenger, "shizuku_apk_installer")
     channel.setMethodCallHandler(this)
-    worker = ShizukuWorker()
+    worker = ShizukuWorker(flutterPluginBinding.applicationContext)
     worker.init()
   }
 
@@ -31,6 +31,9 @@ class ShizukuApkInstallerPlugin: FlutterPlugin, MethodCallHandler {
   override fun onMethodCall(call: MethodCall, result: Result) {
     if (call.method == "checkPermission") {
       GlobalScope.async { worker.checkPermission(result) }
+    } else if (call.method == "installAPKs") {
+      val apkFilesURIs: List<String> = call.argument("apkFilesURIs")!!
+      GlobalScope.async { worker.installAPKs(apkFilesURIs, result) }
     } else if (call.method == "getPlatformVersion") {
       result.success(android.os.Build.VERSION.SDK_INT.toString())
     } else {

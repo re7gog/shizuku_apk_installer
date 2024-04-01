@@ -16,6 +16,12 @@ class MockShizukuApkInstallerPlatform
     // TODO: implement checkPermission
     throw UnimplementedError();
   }
+
+  @override
+  Future<bool?> installAPKs(List<String> apkFilesURIs) {
+    // TODO: implement installAPKs
+    throw UnimplementedError();
+  }
 }
 
 void main() {
