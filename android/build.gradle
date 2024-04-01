@@ -52,6 +52,12 @@ android {
     dependencies {
         testImplementation 'org.jetbrains.kotlin:kotlin-test'
         testImplementation 'org.mockito:mockito-core:5.0.0'
+
+        def versionShizuku = '13.1.5'
+        implementation "dev.rikka.shizuku:api:$versionShizuku"
+        implementation "dev.rikka.shizuku:provider:$versionShizuku"
+        compileOnly "dev.rikka.hidden:stub:4.3.1"
+        implementation "org.lsposed.hiddenapibypass:hiddenapibypass:4.3"
     }
 
     testOptions {
