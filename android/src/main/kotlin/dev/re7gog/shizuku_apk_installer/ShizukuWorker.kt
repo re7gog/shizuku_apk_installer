@@ -1,155 +1,203 @@
 package dev.re7gog.shizuku_apk_installer
 
 import android.content.Context
+import android.content.IIntentReceiver
+import android.content.IIntentSender
 import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.IPackageInstaller
 import android.content.pm.IPackageInstallerSession
+import android.content.pm.IPackageManager
 import android.content.pm.PackageInstaller
+import android.content.pm.PackageInstallerHidden
 import android.content.pm.PackageManager
+import android.content.pm.PackageManagerHidden
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
+import android.os.IBinder
+import android.os.IInterface
 import android.os.Process
-import dev.re7gog.shizuku_apk_installer.util.IIntentSenderAdaptor
-import dev.re7gog.shizuku_apk_installer.util.IntentSenderUtils
-import dev.re7gog.shizuku_apk_installer.util.PackageInstallerUtils
-import dev.re7gog.shizuku_apk_installer.util.ShizukuSystemServerApi
-import io.flutter.plugin.common.MethodChannel
+import dev.rikka.tools.refine.Refine
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.shizuku.Shizuku
 import rikka.shizuku.ShizukuBinderWrapper
+import rikka.shizuku.SystemServiceHelper
 import java.io.IOException
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 class ShizukuWorker(private val appContext: Context) {
-    private val reqPermCode = (1000..2000).random()
-    private val reqPermListenerMutex = Mutex(locked = true)
-    private var reqPermListenerResult = "undefined"
-    private val requestPermissionListener =
-        Shizuku.OnRequestPermissionResultListener { requestCode: Int, grantResult: Int ->
-            if (requestCode == reqPermCode) {
-                reqPermListenerResult = if (grantResult == PackageManager.PERMISSION_GRANTED) "granted" else "denied"
-                reqPermListenerMutex.unlock()
-            }
-        }
+    private var isBinderAvailable = false
+    private val requestPermissionCode = (1000..2000).random()
+    private val requestPermissionMutex by lazy { Mutex(locked = true) }
+    private var permissionGranted: Boolean? = null
+    private var isRoot: Boolean? = null
 
     fun init() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {  // 9
             HiddenApiBypass.addHiddenApiExemptions("")
         }
-        Shizuku.addRequestPermissionResultListener(requestPermissionListener)
+        Shizuku.addBinderReceivedListenerSticky(binderReceivedListener)
+        Shizuku.addBinderDeadListener(binderDeadListener)
+        Shizuku.addRequestPermissionResultListener(requestPermissionResultListener)
     }
 
     fun exit() {
-        Shizuku.removeRequestPermissionResultListener(requestPermissionListener)
+        Shizuku.removeBinderReceivedListener(binderReceivedListener)
+        Shizuku.removeBinderDeadListener(binderDeadListener)
+        Shizuku.removeRequestPermissionResultListener(requestPermissionResultListener)
     }
 
-    suspend fun checkPermission(result: MethodChannel.Result) {
-        try {
-            if (Shizuku.isPreV11()) {
-                result.success("unsupported")
-            } else if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
-                result.success("granted")
-            } else if (Shizuku.shouldShowRequestPermissionRationale()) {  // Deny and don't ask again
-                result.success("denied")
-            } else {
-                Shizuku.requestPermission(reqPermCode)
-                reqPermListenerMutex.lock()
-                result.success(reqPermListenerResult)
+    private val binderReceivedListener = Shizuku.OnBinderReceivedListener {
+        isBinderAvailable = true
+    }
+
+    private val binderDeadListener = Shizuku.OnBinderDeadListener {
+        isBinderAvailable = false
+    }
+
+    private val requestPermissionResultListener =
+        Shizuku.OnRequestPermissionResultListener { requestCode: Int, grantResult: Int ->
+            if (requestCode == requestPermissionCode) {
+                permissionGranted = grantResult == PackageManager.PERMISSION_GRANTED
+                requestPermissionMutex.unlock()
             }
-        } catch (_: Exception) {  // Shizuku binder not found
-            result.success("not_found")
+        }
+
+    suspend fun checkPermission(): String {
+        return if (!isBinderAvailable) {
+            "binder_not_found"
+        } else if (Shizuku.isPreV11()) {
+            "old_shizuku"
+        } else if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+            if (!registerUidObserverPermissionLimitedCheck()) "granted" else "old_android_with_adb"
+        } else if (Shizuku.shouldShowRequestPermissionRationale()) {  // "Deny and don't ask again"
+            "denied"
+        } else {
+            Shizuku.requestPermission(requestPermissionCode)
+            requestPermissionMutex.lock()
+            if (!registerUidObserverPermissionLimitedCheck()) {
+                if (permissionGranted!!) "granted" else "denied"
+            } else "old_android_with_adb"
         }
     }
 
-    suspend fun installAPKs(apkFilesURIs: List<String>, result: MethodChannel.Result) {
-        var res: Boolean
-        var session: PackageInstaller.Session? = null
-        try {
-            val iPackageInstaller: IPackageInstaller = ShizukuSystemServerApi.PackageManager_getPackageInstaller()
-            val isRoot = Shizuku.getUid() == 0
-            // The reason for use "com.android.shell" as installer package under ADB
-            // is that getMySessions will check installer package's owner
-            val installerPackageName = if (isRoot) appContext.packageName else "com.android.shell"
-            var installerAttributionTag: String? = null
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                installerAttributionTag = appContext.attributionTag
-            }
-            val userId = if (isRoot) Process.myUserHandle().hashCode() else 0
+    /**
+     * Android 8.0 with ADB lacks IActivityManager#registerUidObserver permission, so we can't install apps without activity
+     */
+    private fun registerUidObserverPermissionLimitedCheck(): Boolean {
+        isRoot = Shizuku.getUid() == 0
+        return !isRoot!! and (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1)
+    }
 
-            val packageInstaller = PackageInstallerUtils.createPackageInstaller(
-                iPackageInstaller, installerPackageName, installerAttributionTag, userId)
+    private fun IBinder.wrap() = ShizukuBinderWrapper(this)
+    private fun IInterface.asShizukuBinder() = this.asBinder().wrap()
 
-            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-            var installFlags: Int = PackageInstallerUtils.getInstallFlags(params)
-            installFlags = installFlags or (0x00000002 /*PackageManager.INSTALL_REPLACE_EXISTING*/
-                    or 0x00000004 /*PackageManager.INSTALL_ALLOW_TEST*/)
-            PackageInstallerUtils.setInstallFlags(params, installFlags)
+    private val iPackageManager: IPackageManager by lazy {
+        IPackageManager.Stub.asInterface(SystemServiceHelper.getSystemService("package").wrap())
+    }
 
-            val sessionId = packageInstaller.createSession(params)
-            val iSession = IPackageInstallerSession.Stub.asInterface(
-                ShizukuBinderWrapper(iPackageInstaller.openSession(sessionId).asBinder()))
-            session = PackageInstallerUtils.createSession(iSession)
+    private val iPackageInstaller: IPackageInstaller by lazy {
+        IPackageInstaller.Stub.asInterface(iPackageManager.packageInstaller.asShizukuBinder())
+    }
 
-            for ((apkI, uriStr) in apkFilesURIs.withIndex()) {
-                val uri = Uri.parse(uriStr)
-                val inputStream = appContext.contentResolver.openInputStream(uri)!!
-                val openedSession = session.openWrite("$apkI.apk", 0, -1)
+    private val packageInstaller: PackageInstaller by lazy {
+        // The reason for use "com.android.shell" as installer package under adb is that getMySessions will check installer package's owner
+        val installerPackageName = if (isRoot!!) appContext.packageName else "com.android.shell"
+        val userId = if (!isRoot!!) Process.myUserHandle().hashCode() else 0
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Refine.unsafeCast(PackageInstallerHidden(iPackageInstaller, installerPackageName, appContext.attributionTag, userId))
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
+            Refine.unsafeCast(PackageInstallerHidden(iPackageInstaller, installerPackageName, userId))
+        } else {
+            val application = appContext.applicationContext
+            Refine.unsafeCast(PackageInstallerHidden(application, application.packageManager, iPackageInstaller, installerPackageName, userId))
+        }
+    }
 
-                val buffer = ByteArray(8192)
-                var length: Int
-                withContext(Dispatchers.IO) {
-                    try {
-                        while (inputStream.read(buffer).also { length = it } > 0) {
-                            openedSession.write(buffer, 0, length)
-                            openedSession.flush()
-                            session.fsync(openedSession)
-                        }
-                    } finally {
-                        try {
-                            inputStream.close()
-                        } catch (e: IOException) {
-                            e.printStackTrace()
-                        }
-                        try {
-                            openedSession.close()
-                        } catch (e: IOException) {
-                            e.printStackTrace()
+    private fun createPackageInstallerSession(params: PackageInstaller.SessionParams): PackageInstaller.Session {
+        val sessionId = packageInstaller.createSession(params)
+        val iSession = IPackageInstallerSession.Stub.asInterface(iPackageInstaller.openSession(sessionId).asShizukuBinder())
+        return Refine.unsafeCast(PackageInstallerHidden.SessionHidden(iSession))
+    }
+
+    suspend fun installAPKs(apkURIs: List<String>): Pair<Int, String?> {
+        var status = PackageInstaller.STATUS_FAILURE
+        var message: String? = null
+        val conetentResolver = appContext.contentResolver
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+                var flags = Refine.unsafeCast<PackageInstallerHidden.SessionParamsHidden>(params).installFlags
+                flags = flags or PackageManagerHidden.INSTALL_ALLOW_TEST or PackageManagerHidden.INSTALL_REPLACE_EXISTING
+                Refine.unsafeCast<PackageInstallerHidden.SessionParamsHidden>(params).installFlags = flags
+                createPackageInstallerSession(params).use { session ->
+                    apkURIs.forEachIndexed { index, uriString ->
+                        val uri = Uri.parse(uriString)
+                        val stream = conetentResolver.openInputStream(uri) ?: throw IOException("Cannot open input stream")
+                        stream.use {
+                            session.openWrite("$index.apk", 0, stream.available().toLong()).use { output ->
+                                stream.copyTo(output)
+                                session.fsync(output)
+                            }
                         }
                     }
-                }
-                delay(1000)
-            }
-
-            val results = arrayOf<Intent?>(null)
-            val mutex = Mutex(locked = true)
-            val intentSender: IntentSender =
-                IntentSenderUtils.newInstance(object : IIntentSenderAdaptor() {
-                    override fun send(intent: Intent?) {
-                        results[0] = intent
-                        mutex.unlock()
+                    var result: Intent? = null
+                    suspendCoroutine { cont ->
+                        val adapter = IntentSenderHelper.IIntentSenderAdaptor { intent ->
+                            result = intent
+                            cont.resume(Unit)
+                        }
+                        val intentSender = IntentSenderHelper.newIntentSender(adapter)
+                        session.commit(intentSender)
                     }
-                })
-            session.commit(intentSender)
-            mutex.lock()
-            res = results[0]!!.getIntExtra(
-                PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE) == 0
-        } catch (ex: Exception) {
-            ex.printStackTrace()
-            res = false
-        } finally {
-            if (session != null) {
-                try {
-                    session.close()
-                } catch (ex: Exception) {
-                    ex.printStackTrace()
-                    res = false
+                    result?.let {
+                        status = it.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+                        message = it.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
+                    } ?: throw IOException("Intent is null")
                 }
+            }.onFailure {
+                status = PackageInstaller.STATUS_FAILURE
+                message = it.message + "\n" + it.stackTraceToString()
             }
         }
-        result.success(res)
+        return Pair(status, message)
+    }
+}
+
+
+object IntentSenderHelper {
+    fun newIntentSender(binder: IIntentSender): IntentSender {
+        return IntentSender::class.java.getConstructor(IIntentSender::class.java).newInstance(binder)
+    }
+
+    class IIntentSenderAdaptor(private val listener: (Intent) -> Unit) : IIntentSender.Stub() {
+        override fun send(
+            code: Int,
+            intent: Intent,
+            resolvedType: String?,
+            finishedReceiver: IIntentReceiver?,
+            requiredPermission: String?,
+            options: Bundle?
+        ): Int {
+            listener(intent)
+            return 0
+        }
+
+        override fun send(
+            code: Int,
+            intent: Intent,
+            resolvedType: String?,
+            whitelistToken: IBinder?,
+            finishedReceiver: IIntentReceiver?,
+            requiredPermission: String?,
+            options: Bundle?
+        ) {
+            listener(intent)
+        }
     }
 }

@@ -1,7 +1,5 @@
 package dev.re7gog.shizuku_apk_installer
 
-import androidx.annotation.NonNull
-
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -29,15 +27,29 @@ class ShizukuApkInstallerPlugin: FlutterPlugin, MethodCallHandler {
 
   @OptIn(DelicateCoroutinesApi::class)
   override fun onMethodCall(call: MethodCall, result: Result) {
-    if (call.method == "checkPermission") {
-      GlobalScope.async { worker.checkPermission(result) }
-    } else if (call.method == "installAPKs") {
-      val apkFilesURIs: List<String> = call.argument("apkFilesURIs")!!
-      GlobalScope.async { worker.installAPKs(apkFilesURIs, result) }
-    } else if (call.method == "getPlatformVersion") {
-      result.success(android.os.Build.VERSION.SDK_INT.toString())
-    } else {
-      result.notImplemented()
+    when (call.method) {
+        "checkPermission" -> {
+          GlobalScope.async {
+            val res = worker.checkPermission()
+            result.success(res)
+          }
+        }
+        "installAPKs" -> {
+          val apkFilesURIs: List<String> = call.argument("apkFilesURIs")!!
+          GlobalScope.async {
+            val res = worker.installAPKs(apkFilesURIs)
+            if (res.first == 0)
+              result.success(true)
+            else
+              result.success(false)
+          }
+        }
+        "getPlatformVersion" -> {
+          result.success(android.os.Build.VERSION.SDK_INT.toString())
+        }
+        else -> {
+          result.notImplemented()
+        }
     }
   }
 
