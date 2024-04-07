@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
@@ -18,6 +19,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   String _platformVersion = 'Unknown';
   String _permission = 'Not requested yet';
+  String _installRes = 'Not installed yet';
   final _shizukuApkInstallerPlugin = ShizukuApkInstaller();
 
   @override
@@ -61,23 +63,46 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  Future<void> installAPKs() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom, allowedExtensions: ['apk'],
+    );
+    if (result != null) {
+      List<String> filesURIs = result.paths.map((path) => 'file://${path!}').toList();
+      bool? resBool = await _shizukuApkInstallerPlugin.installAPKs(filesURIs);
+      String res = resBool! ? "Success" : "Fail";
+      setState(() {
+        _installRes = res;
+      });
+    } else {
+      // User canceled the picker
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Plugin example app'),
-        ),
-        body: Column(
-          children: [
-            Text('Running on: $_platformVersion\n'),
-            TextButton(
-                onPressed: checkPermission,
-                child: const Text('Check Shizuku Permission')
+          appBar: AppBar(
+            title: const Text('Plugin example app'),
+          ),
+          body: Center(
+            child: Column(
+                children: [
+                  Text('Running on: $_platformVersion\n'),
+                  TextButton(
+                      onPressed: checkPermission,
+                      child: const Text('Check Shizuku Permission')
+                  ),
+                  Text(_permission),
+                  TextButton(
+                      onPressed: installAPKs,
+                      child: const Text('Pick and install APK')
+                  ),
+                  Text(_installRes)
+                ]
             ),
-            Text(_permission),
-          ]
-        ),
+          )
       ),
     );
   }
