@@ -1,0 +1,1 @@
+-keep class dev.re7gog.shizuku_apk_installer.** { *; }

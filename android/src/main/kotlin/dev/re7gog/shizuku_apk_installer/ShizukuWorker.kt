@@ -128,7 +128,7 @@ class ShizukuWorker(private val appContext: Context) {
     suspend fun installAPKs(apkURIs: List<String>): Pair<Int, String?> {
         var status = PackageInstaller.STATUS_FAILURE
         var message: String? = null
-        val conetentResolver = appContext.contentResolver
+        val contentResolver = appContext.contentResolver
         withContext(Dispatchers.IO) {
             runCatching {
                 val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
@@ -138,7 +138,7 @@ class ShizukuWorker(private val appContext: Context) {
                 createPackageInstallerSession(params).use { session ->
                     apkURIs.forEachIndexed { index, uriString ->
                         val uri = Uri.parse(uriString)
-                        val stream = conetentResolver.openInputStream(uri) ?: throw IOException("Cannot open input stream")
+                        val stream = contentResolver.openInputStream(uri) ?: throw IOException("Cannot open input stream")
                         stream.use {
                             session.openWrite("$index.apk", 0, stream.available().toLong()).use { output ->
                                 stream.copyTo(output)
