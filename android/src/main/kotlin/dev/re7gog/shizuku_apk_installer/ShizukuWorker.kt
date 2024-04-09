@@ -26,7 +26,9 @@ import kotlinx.coroutines.withContext
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.shizuku.Shizuku
 import rikka.shizuku.ShizukuBinderWrapper
+import rikka.shizuku.ShizukuProvider
 import rikka.shizuku.SystemServiceHelper
+import rikka.sui.Sui
 import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
@@ -41,6 +43,11 @@ class ShizukuWorker(private val appContext: Context) {
     fun init() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
             HiddenApiBypass.addHiddenApiExemptions("")
+        val isSui = Sui.init(appContext.packageName)
+        if (!isSui) {
+            ShizukuProvider.enableMultiProcessSupport(false)
+            ShizukuProvider.requestBinderForNonProviderProcess(appContext)
+        }
         Shizuku.addBinderReceivedListenerSticky(binderReceivedListener)
         Shizuku.addBinderDeadListener(binderDeadListener)
         Shizuku.addRequestPermissionResultListener(requestPermissionResultListener)
