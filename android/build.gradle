@@ -49,6 +49,7 @@ android {
     }
 
     defaultConfig {
+        consumerProguardFiles 'consumer-rules.pro'
         minSdkVersion 24
     }
 
