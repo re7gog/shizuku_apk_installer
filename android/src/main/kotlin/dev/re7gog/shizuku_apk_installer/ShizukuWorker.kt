@@ -18,6 +18,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.os.IInterface
 import android.os.Process
+import android.util.Log
 import dev.rikka.tools.refine.Refine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -38,9 +39,8 @@ class ShizukuWorker(private val appContext: Context) {
     private var isRoot: Boolean? = null
 
     fun init() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {  // 9
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
             HiddenApiBypass.addHiddenApiExemptions("")
-        }
         Shizuku.addBinderReceivedListenerSticky(binderReceivedListener)
         Shizuku.addBinderDeadListener(binderDeadListener)
         Shizuku.addRequestPermissionResultListener(requestPermissionResultListener)
@@ -94,7 +94,10 @@ class ShizukuWorker(private val appContext: Context) {
         return !isRoot!! and (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1)
     }
 
+    // Thanks to https://github.com/LSPosed/LSPatch
+
     private fun IBinder.wrap() = ShizukuBinderWrapper(this)
+
     private fun IInterface.asShizukuBinder() = this.asBinder().wrap()
 
     private val iPackageManager: IPackageManager by lazy {
@@ -106,7 +109,8 @@ class ShizukuWorker(private val appContext: Context) {
     }
 
     private val packageInstaller: PackageInstaller by lazy {
-        // The reason for use "com.android.shell" as installer package under adb is that getMySessions will check installer package's owner
+        // The reason for use "com.android.shell" as installer package under ADB
+        // is that getMySessions will check installer package's owner
         val installerPackageName = if (isRoot!!) appContext.packageName else "com.android.shell"
         val userId = if (!isRoot!!) Process.myUserHandle().hashCode() else 0
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -125,9 +129,8 @@ class ShizukuWorker(private val appContext: Context) {
         return Refine.unsafeCast(PackageInstallerHidden.SessionHidden(iSession))
     }
 
-    suspend fun installAPKs(apkURIs: List<String>): Pair<Int, String?> {
+    suspend fun installAPKs(apkURIs: List<String>): Int {
         var status = PackageInstaller.STATUS_FAILURE
-        var message: String? = null
         val contentResolver = appContext.contentResolver
         withContext(Dispatchers.IO) {
             runCatching {
@@ -157,15 +160,17 @@ class ShizukuWorker(private val appContext: Context) {
                     }
                     result?.let {
                         status = it.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
-                        message = it.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
+                        val message = it.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "No message"
+                        Log.i("shizuku_apk_installer", "Package installer result: $message")
                     } ?: throw IOException("Intent is null")
                 }
             }.onFailure {
                 status = PackageInstaller.STATUS_FAILURE
-                message = it.message + "\n" + it.stackTraceToString()
+                val message = it.message + "\n" + it.stackTraceToString()
+                Log.e("shizuku_apk_installer", "Installing error: $message")
             }
         }
-        return Pair(status, message)
+        return status
     }
 }
 

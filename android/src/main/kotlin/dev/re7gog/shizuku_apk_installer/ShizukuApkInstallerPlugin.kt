@@ -38,10 +38,7 @@ class ShizukuApkInstallerPlugin: FlutterPlugin, MethodCallHandler {
           val apkFilesURIs: List<String> = call.argument("apkFilesURIs")!!
           GlobalScope.async {
             val res = worker.installAPKs(apkFilesURIs)
-            if (res.first == 0)
-              result.success(true)
-            else
-              result.success(false)
+            result.success(res == 0)
           }
         }
         "getPlatformVersion" -> {
