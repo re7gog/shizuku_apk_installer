@@ -39,6 +39,7 @@ class ShizukuWorker(private val appContext: Context) {
     private val requestPermissionMutex by lazy { Mutex(locked = true) }
     private var permissionGranted: Boolean? = null
     private var isRoot: Boolean? = null
+    private var pretendToBeAPlayStore = false
 
     fun init() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
@@ -59,14 +60,8 @@ class ShizukuWorker(private val appContext: Context) {
         Shizuku.removeRequestPermissionResultListener(requestPermissionResultListener)
     }
 
-    private val binderReceivedListener = Shizuku.OnBinderReceivedListener {
-        isBinderAvailable = true
-    }
-
-    private val binderDeadListener = Shizuku.OnBinderDeadListener {
-        isBinderAvailable = false
-    }
-
+    private val binderReceivedListener = Shizuku.OnBinderReceivedListener { isBinderAvailable = true }
+    private val binderDeadListener = Shizuku.OnBinderDeadListener { isBinderAvailable = false }
     private val requestPermissionResultListener =
         Shizuku.OnRequestPermissionResultListener { requestCode: Int, grantResult: Int ->
             if (requestCode == requestPermissionCode) {
@@ -101,32 +96,32 @@ class ShizukuWorker(private val appContext: Context) {
         return !isRoot!! and (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1)
     }
 
-    // Thanks to https://github.com/LSPosed/LSPatch
+    // Thanks to https://github.com/LSPosed/LSPatch and https://gitlab.com/AuroraOSS/AuroraStore
 
     private fun IBinder.wrap() = ShizukuBinderWrapper(this)
-
     private fun IInterface.asShizukuBinder() = this.asBinder().wrap()
 
     private val iPackageManager: IPackageManager by lazy {
         IPackageManager.Stub.asInterface(SystemServiceHelper.getSystemService("package").wrap())
     }
-
     private val iPackageInstaller: IPackageInstaller by lazy {
         IPackageInstaller.Stub.asInterface(iPackageManager.packageInstaller.asShizukuBinder())
     }
 
     private val packageInstaller: PackageInstaller by lazy {
-        // The reason for use "com.android.shell" as installer package under ADB
-        // is that getMySessions will check installer package's owner
-        val installerPackageName = if (isRoot!!) appContext.packageName else "com.android.shell"
+        val installerPackageName = if (pretendToBeAPlayStore) {
+            "com.android.vending"
+        } else if (isRoot!!) {
+            appContext.packageName
+        } else {
+            "com.android.shell" }
         val userId = if (!isRoot!!) Process.myUserHandle().hashCode() else 0
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             Refine.unsafeCast(PackageInstallerHidden(iPackageInstaller, installerPackageName, appContext.attributionTag, userId))
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
             Refine.unsafeCast(PackageInstallerHidden(iPackageInstaller, installerPackageName, userId))
         } else {
-            val application = appContext.applicationContext
-            Refine.unsafeCast(PackageInstallerHidden(application, application.packageManager, iPackageInstaller, installerPackageName, userId))
+            Refine.unsafeCast(PackageInstallerHidden(appContext, appContext.packageManager, iPackageInstaller, installerPackageName, userId))
         }
     }
 
@@ -136,9 +131,9 @@ class ShizukuWorker(private val appContext: Context) {
         return Refine.unsafeCast(PackageInstallerHidden.SessionHidden(iSession))
     }
 
-    suspend fun installAPKs(apkURIs: List<String>): Int {
+    suspend fun installAPKs(apkURIs: List<String>, pretendToBeAGooglePlayStore: Boolean = false): Int {
+        pretendToBeAPlayStore = pretendToBeAGooglePlayStore
         var status = PackageInstaller.STATUS_FAILURE
-        val contentResolver = appContext.contentResolver
         withContext(Dispatchers.IO) {
             runCatching {
                 val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
@@ -148,7 +143,7 @@ class ShizukuWorker(private val appContext: Context) {
                 createPackageInstallerSession(params).use { session ->
                     apkURIs.forEachIndexed { index, uriString ->
                         val uri = Uri.parse(uriString)
-                        val stream = contentResolver.openInputStream(uri) ?: throw IOException("Cannot open input stream")
+                        val stream = appContext.contentResolver.openInputStream(uri) ?: throw IOException("Cannot open input stream")
                         stream.use {
                             session.openWrite("$index.apk", 0, stream.available().toLong()).use { output ->
                                 stream.copyTo(output)
@@ -172,7 +167,6 @@ class ShizukuWorker(private val appContext: Context) {
                     } ?: throw IOException("Intent is null")
                 }
             }.onFailure {
-                status = PackageInstaller.STATUS_FAILURE
                 val message = it.message + "\n" + it.stackTraceToString()
                 Log.e("shizuku_apk_installer", "Installing error: $message")
             }
