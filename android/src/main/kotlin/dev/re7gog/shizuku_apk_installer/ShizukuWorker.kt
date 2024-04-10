@@ -43,7 +43,10 @@ class ShizukuWorker(private val appContext: Context) {
 
     fun init() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-            HiddenApiBypass.addHiddenApiExemptions("")
+            HiddenApiBypass.addHiddenApiExemptions(
+                "Landroid/content",
+                "Landroid/os"
+            )
         val isSui = Sui.init(appContext.packageName)
         if (!isSui) {
             ShizukuProvider.enableMultiProcessSupport(false)
