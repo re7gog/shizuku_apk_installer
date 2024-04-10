@@ -35,7 +35,7 @@ import kotlin.coroutines.suspendCoroutine
 
 class ShizukuWorker(private val appContext: Context) {
     private var isBinderAvailable = false
-    private val requestPermissionCode = (1000..2000).random()
+    private val requestPermissionCode = 1945
     private val requestPermissionMutex by lazy { Mutex(locked = true) }
     private var permissionGranted: Boolean? = null
     private var isRoot: Boolean? = null
@@ -76,14 +76,18 @@ class ShizukuWorker(private val appContext: Context) {
         } else if (Shizuku.isPreV11()) {
             "old_shizuku"
         } else if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
-            if (!registerUidObserverPermissionLimitedCheck()) "granted" else "old_android_with_adb"
+            if (!registerUidObserverPermissionLimitedCheck()){
+                "granted_" + if (isRoot!!) "root" else "adb"
+            } else "old_android_with_adb"
         } else if (Shizuku.shouldShowRequestPermissionRationale()) {  // "Deny and don't ask again"
             "denied"
         } else {
             Shizuku.requestPermission(requestPermissionCode)
             requestPermissionMutex.lock()
             if (!registerUidObserverPermissionLimitedCheck()) {
-                if (permissionGranted!!) "granted" else "denied"
+                if (permissionGranted!!){
+                    "granted_" + if (isRoot!!) "root" else "adb"
+                } else "denied"
             } else "old_android_with_adb"
         }
     }
@@ -131,6 +135,10 @@ class ShizukuWorker(private val appContext: Context) {
         return Refine.unsafeCast(PackageInstallerHidden.SessionHidden(iSession))
     }
 
+    /**
+     * Install a list of APKs using their URIs, the permission must have already been checked
+     * @param pretendToBeAGooglePlayStore Pretend to be a Play Store, use only if the root access provided
+     */
     suspend fun installAPKs(apkURIs: List<String>, pretendToBeAGooglePlayStore: Boolean = false): Int {
         pretendToBeAPlayStore = pretendToBeAGooglePlayStore
         var status = PackageInstaller.STATUS_FAILURE

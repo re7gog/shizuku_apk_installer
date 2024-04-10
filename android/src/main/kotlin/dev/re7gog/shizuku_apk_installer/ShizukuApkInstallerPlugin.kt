@@ -5,53 +5,61 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 
-/** ShizukuApkInstallerPlugin */
 class ShizukuApkInstallerPlugin: FlutterPlugin, MethodCallHandler {
-  /// The MethodChannel that will the communication between Flutter and native Android
-  ///
-  /// This local reference serves to register the plugin with the Flutter Engine and unregister it
-  /// when the Flutter Engine is detached from the Activity
-  private lateinit var channel : MethodChannel
-  private lateinit var worker : ShizukuWorker
+    private lateinit var channel: MethodChannel
+    private lateinit var worker: ShizukuWorker
+    private var job: Job? = null
+    private var result: Result? = null
 
-  override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-    channel = MethodChannel(flutterPluginBinding.binaryMessenger, "shizuku_apk_installer")
-    channel.setMethodCallHandler(this)
-    worker = ShizukuWorker(flutterPluginBinding.applicationContext)
-    worker.init()
-  }
+    override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+        worker = ShizukuWorker(flutterPluginBinding.applicationContext)
+        worker.init()
+        channel = MethodChannel(flutterPluginBinding.binaryMessenger, "shizuku_apk_installer")
+        channel.setMethodCallHandler(this)
+    }
 
-  @OptIn(DelicateCoroutinesApi::class)
-  override fun onMethodCall(call: MethodCall, result: Result) {
-    when (call.method) {
-        "checkPermission" -> {
-          GlobalScope.async {
-            val res = worker.checkPermission()
-            result.success(res)
-          }
+    override fun onMethodCall(call: MethodCall, currentResult: Result) {
+        if (job?.isActive == true) {
+            job!!.cancel()
+            result!!.error("cancelled", "Job cancelled",
+                "The job was canceled due to the creation of another new one")
         }
-        "installAPKs" -> {
-          val apkFilesURIs: List<String> = call.argument("apkFilesURIs")!!
-          GlobalScope.async {
-            val res = worker.installAPKs(apkURIs=apkFilesURIs)
-            result.success(res == 0)
-          }
-        }
-        "getPlatformVersion" -> {
-          result.success(android.os.Build.VERSION.SDK_INT.toString())
-        }
-        else -> {
-          result.notImplemented()
+        result = currentResult
+        when (call.method) {
+            "checkPermission" -> {
+                job = CoroutineScope(Dispatchers.Default).async {
+                    val res = worker.checkPermission()
+                    result!!.success(res)
+                }
+            }
+            "installAPKs" -> {
+                val apkFilesURIs: List<String> = call.argument("apkFilesURIs")!!
+                job = CoroutineScope(Dispatchers.Default).async {
+                    val res = worker.installAPKs(apkURIs=apkFilesURIs)
+                    result!!.success(res == 0)
+                }
+            }
+            "getPlatformVersion" -> {
+                result!!.success(android.os.Build.VERSION.SDK_INT.toString())
+            }
+            else -> {
+                result!!.notImplemented()
+            }
         }
     }
-  }
 
-  override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-    channel.setMethodCallHandler(null)
-    worker.exit()
-  }
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channel.setMethodCallHandler(null)
+        if (job?.isActive == true) {
+            job!!.cancel()
+            result!!.error("destroyed", "Job destroyed",
+                "The job was canceled due to the destruction of the plugin")
+        }
+        worker.exit()
+    }
 }
