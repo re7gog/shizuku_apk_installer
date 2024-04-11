@@ -11,4 +11,7 @@ class ShizukuApkInstaller {
   Future<bool?> installAPKs(List<String> apkFilesURIs) {
     return ShizukuApkInstallerPlatform.instance.installAPKs(apkFilesURIs);
   }
+  Future<bool?> uninstallPackage(String packageName) {
+    return ShizukuApkInstallerPlatform.instance.uninstallPackage(packageName);
+  }
 }

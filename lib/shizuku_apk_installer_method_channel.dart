@@ -26,4 +26,10 @@ class MethodChannelShizukuApkInstaller extends ShizukuApkInstallerPlatform {
     final success = await methodChannel.invokeMethod<bool>('installAPKs', {'apkFilesURIs': apkFilesURIs});
     return success;
   }
+
+  @override
+  Future<bool?> uninstallPackage(String packageName) async {
+    final success = await methodChannel.invokeMethod<bool>('uninstallPackage', {'packageName': packageName});
+    return success;
+  }
 }

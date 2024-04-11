@@ -22,6 +22,12 @@ class MockShizukuApkInstallerPlatform
     // TODO: implement installAPKs
     throw UnimplementedError();
   }
+
+  @override
+  Future<bool?> uninstallPackage(String packageName) {
+    // TODO: implement uninstallPackage
+    throw UnimplementedError();
+  }
 }
 
 void main() {

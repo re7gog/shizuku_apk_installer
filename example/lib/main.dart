@@ -20,6 +20,8 @@ class _MyAppState extends State<MyApp> {
   String _platformVersion = 'Unknown';
   String _permission = 'Not requested yet';
   String _installRes = 'Not installed yet';
+  String _uninstallRes = 'Not uninstalled yet';
+  final _uninstallPackageNameCtrl = TextEditingController();
   final _shizukuApkInstallerPlugin = ShizukuApkInstaller();
 
   @override
@@ -79,8 +81,22 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  Future<void> uninstallPackage() async {
+    String text = _uninstallPackageNameCtrl.text;
+    if (text != "") {
+      bool? resBool = await _shizukuApkInstallerPlugin.uninstallPackage(text);
+      String res = resBool! ? "Success" : "Fail";
+      setState(() {
+        _uninstallRes = res;
+      });
+    } else {
+      // User canceled the picker
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    const box = SizedBox(height: 32);
     return MaterialApp(
       home: Scaffold(
           appBar: AppBar(
@@ -95,11 +111,25 @@ class _MyAppState extends State<MyApp> {
                       child: const Text('Check Shizuku Permission')
                   ),
                   Text(_permission),
+                  box,
                   TextButton(
                       onPressed: installAPKs,
                       child: const Text('Pick and install APK')
                   ),
-                  Text(_installRes)
+                  Text(_installRes),
+                  box,
+                  TextFormField(
+                    controller: _uninstallPackageNameCtrl,
+                    decoration: const InputDecoration(
+                      border: UnderlineInputBorder(),
+                      labelText: 'Enter package name to uninstall',
+                    )
+                  ),
+                  TextButton(
+                      onPressed: uninstallPackage,
+                      child: const Text("Uninstall package with given name")
+                  ),
+                  Text(_uninstallRes)
                 ]
             ),
           )

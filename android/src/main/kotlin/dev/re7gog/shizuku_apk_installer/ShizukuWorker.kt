@@ -1,5 +1,6 @@
 package dev.re7gog.shizuku_apk_installer
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.IIntentReceiver
 import android.content.IIntentSender
@@ -116,12 +117,7 @@ class ShizukuWorker(private val appContext: Context) {
     }
 
     private val packageInstaller: PackageInstaller by lazy {
-        val installerPackageName = if (pretendToBeAPlayStore) {
-            "com.android.vending"
-        } else if (isRoot!!) {
-            appContext.packageName
-        } else {
-            "com.android.shell" }
+        val installerPackageName = if (pretendToBeAPlayStore) "com.android.vending" else appContext.packageName
         val userId = if (!isRoot!!) Process.myUserHandle().hashCode() else 0
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             Refine.unsafeCast(PackageInstallerHidden(iPackageInstaller, installerPackageName, appContext.attributionTag, userId))
@@ -139,8 +135,9 @@ class ShizukuWorker(private val appContext: Context) {
     }
 
     /**
-     * Install a list of APKs using their URIs, the permission must have already been checked
-     * @param pretendToBeAGooglePlayStore Pretend to be a Play Store, use only if the root access provided
+     * Install a list of APKs using their URIs without asking user.
+     * The permission must have already been checked!
+     * @param pretendToBeAGooglePlayStore Pretend to be a Play Store (root access is not needed)
      */
     suspend fun installAPKs(apkURIs: List<String>, pretendToBeAGooglePlayStore: Boolean = false): Int {
         pretendToBeAPlayStore = pretendToBeAGooglePlayStore
@@ -180,6 +177,38 @@ class ShizukuWorker(private val appContext: Context) {
             }.onFailure {
                 val message = it.message + "\n" + it.stackTraceToString()
                 Log.e("shizuku_apk_installer", "Installing error: $message")
+            }
+        }
+        return status
+    }
+
+    /**
+     * Uninstall a package (app) by its name without asking user.
+     * The permission must have already been checked!
+     * android.permission.REQUEST_DELETE_PACKAGES is not needed.
+     */
+    @SuppressLint("MissingPermission")
+    suspend fun uninstallPackage(packageName: String): Int {
+        var status = PackageInstaller.STATUS_FAILURE
+        withContext(Dispatchers.IO) {
+            runCatching {
+                var result: Intent? = null
+                suspendCoroutine { cont ->
+                    val adapter = IntentSenderHelper.IIntentSenderAdaptor { intent ->
+                        result = intent
+                        cont.resume(Unit)
+                    }
+                    val intentSender = IntentSenderHelper.newIntentSender(adapter)
+                    packageInstaller.uninstall(packageName, intentSender)
+                }
+                result?.let {
+                    status = it.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+                    val message = it.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "No message"
+                    Log.i("shizuku_apk_installer", "Package uninstaller result: $message")
+                } ?: throw IOException("Intent is null")
+            }.onFailure {
+                val message = it.message + "\n" + it.stackTraceToString()
+                Log.e("shizuku_apk_installer", "Uninstalling error: $message")
             }
         }
         return status

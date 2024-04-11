@@ -44,6 +44,13 @@ class ShizukuApkInstallerPlugin: FlutterPlugin, MethodCallHandler {
                     result!!.success(res == 0)
                 }
             }
+            "uninstallPackage" -> {
+                val packageName: String = call.argument("packageName")!!
+                job = CoroutineScope(Dispatchers.Default).async {
+                    val res = worker.uninstallPackage(packageName)
+                    result!!.success(res == 0)
+                }
+            }
             "getPlatformVersion" -> {
                 result!!.success(android.os.Build.VERSION.SDK_INT.toString())
             }

@@ -34,4 +34,8 @@ abstract class ShizukuApkInstallerPlatform extends PlatformInterface {
   Future<bool?> installAPKs(List<String> apkFilesURIs) {
     throw UnimplementedError('installAPKs() has not been implemented.');
   }
+
+  Future<bool?> uninstallPackage(String packageName) {
+    throw UnimplementedError('packageName() has not been implemented.');
+  }
 }
