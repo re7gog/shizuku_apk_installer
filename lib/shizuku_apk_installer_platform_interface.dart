@@ -23,7 +23,7 @@ abstract class ShizukuApkInstallerPlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  Future<String?> getPlatformVersion() {
+  Future<int?> getPlatformVersion() {
     throw UnimplementedError('platformVersion() has not been implemented.');
   }
 
@@ -31,11 +31,11 @@ abstract class ShizukuApkInstallerPlatform extends PlatformInterface {
     throw UnimplementedError('checkPermission() has not been implemented.');
   }
 
-  Future<bool?> installAPKs(List<String> apkFilesURIs) {
+  Future<int?> installAPKs(List<String> apkFilesURIs, String packageToPretendToBe) {
     throw UnimplementedError('installAPKs() has not been implemented.');
   }
 
-  Future<bool?> uninstallPackage(String packageName) {
+  Future<int?> uninstallPackage(String packageName) {
     throw UnimplementedError('packageName() has not been implemented.');
   }
 }

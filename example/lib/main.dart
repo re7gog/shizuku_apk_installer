@@ -20,6 +20,7 @@ class _MyAppState extends State<MyApp> {
   String _platformVersion = 'Unknown';
   String _permission = 'Not requested yet';
   String _installRes = 'Not installed yet';
+  final _installerPackageNameCtrl = TextEditingController();
   String _uninstallRes = 'Not uninstalled yet';
   final _uninstallPackageNameCtrl = TextEditingController();
   final _shizukuApkInstallerPlugin = ShizukuApkInstaller();
@@ -36,8 +37,7 @@ class _MyAppState extends State<MyApp> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     // We also handle the message potentially returning null.
     try {
-      platformVersion =
-          await _shizukuApkInstallerPlugin.getPlatformVersion() ?? 'Unknown platform version';
+      platformVersion = (await _shizukuApkInstallerPlugin.getPlatformVersion())?.toString() ?? 'Failed to get platform version.';
     } on PlatformException {
       platformVersion = 'Failed to get platform version.';
     }
@@ -67,12 +67,13 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> installAPKs() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.custom, allowedExtensions: ['apk'],
+      type: FileType.custom, allowedExtensions: ['apk']
     );
     if (result != null) {
-      List<String> filesURIs = result.paths.map((path) => 'file://${path!}').toList();
-      bool? resBool = await _shizukuApkInstallerPlugin.installAPKs(filesURIs);
-      String res = resBool! ? "Success" : "Fail";
+      String fileURI = result.paths.map((path) => 'file://${path!}').toList().first;
+      String packageInstaller = _installerPackageNameCtrl.text;
+      int? resInt = await _shizukuApkInstallerPlugin.installAPK(fileURI, packageInstaller);
+      String res = resInt! == 0 ? "Success" : "Fail";
       setState(() {
         _installRes = res;
       });
@@ -84,8 +85,8 @@ class _MyAppState extends State<MyApp> {
   Future<void> uninstallPackage() async {
     String text = _uninstallPackageNameCtrl.text;
     if (text != "") {
-      bool? resBool = await _shizukuApkInstallerPlugin.uninstallPackage(text);
-      String res = resBool! ? "Success" : "Fail";
+      int? resInt = await _shizukuApkInstallerPlugin.uninstallPackage(text);
+      String res = resInt! == 0 ? "Success" : "Fail";
       setState(() {
         _uninstallRes = res;
       });
@@ -112,6 +113,13 @@ class _MyAppState extends State<MyApp> {
                   ),
                   Text(_permission),
                   box,
+                  TextFormField(
+                      controller: _installerPackageNameCtrl,
+                      decoration: const InputDecoration(
+                        border: UnderlineInputBorder(),
+                        labelText: 'Enter the package installer name to pretend to be it',
+                      )
+                  ),
                   TextButton(
                       onPressed: installAPKs,
                       child: const Text('Pick and install APK')

@@ -34,22 +34,22 @@ import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
-class ShizukuWorker(private val appContext: Context) {
+/**
+ * Casting unsafe spells 🧙‍♂️🔮
+ */
+class ShizukuWizard(private val appContext: Context) {
     private var isBinderAvailable = false
     private val requestPermissionCode = 1945
     private val requestPermissionMutex by lazy { Mutex(locked = true) }
     private var permissionGranted: Boolean? = null
     private var isRoot: Boolean? = null
-    private var pretendToBeAPlayStore = false
+    private var packageToPretendToBe = ""
 
     fun init() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-            HiddenApiBypass.addHiddenApiExemptions(
-                "Landroid/content",
-                "Landroid/os"
-            )
+            HiddenApiBypass.addHiddenApiExemptions("Landroid/content", "Landroid/os")
         val isSui = Sui.init(appContext.packageName)
-        if (!isSui) {
+        if (!isSui) {  // Not sure if it's needed
             ShizukuProvider.enableMultiProcessSupport(false)
             ShizukuProvider.requestBinderForNonProviderProcess(appContext)
         }
@@ -109,15 +109,13 @@ class ShizukuWorker(private val appContext: Context) {
     private fun IBinder.wrap() = ShizukuBinderWrapper(this)
     private fun IInterface.asShizukuBinder() = this.asBinder().wrap()
 
-    private val iPackageManager: IPackageManager by lazy {
-        IPackageManager.Stub.asInterface(SystemServiceHelper.getSystemService("package").wrap())
-    }
     private val iPackageInstaller: IPackageInstaller by lazy {
+        val iPackageManager = IPackageManager.Stub.asInterface(SystemServiceHelper.getSystemService("package").wrap())
         IPackageInstaller.Stub.asInterface(iPackageManager.packageInstaller.asShizukuBinder())
     }
 
     private val packageInstaller: PackageInstaller by lazy {
-        val installerPackageName = if (pretendToBeAPlayStore) "com.android.vending" else appContext.packageName
+        val installerPackageName = if (packageToPretendToBe == "") appContext.packageName else packageToPretendToBe
         val userId = if (!isRoot!!) Process.myUserHandle().hashCode() else 0
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             Refine.unsafeCast(PackageInstallerHidden(iPackageInstaller, installerPackageName, appContext.attributionTag, userId))
@@ -128,27 +126,32 @@ class ShizukuWorker(private val appContext: Context) {
         }
     }
 
-    private fun createPackageInstallerSession(params: PackageInstaller.SessionParams): PackageInstaller.Session {
-        val sessionId = packageInstaller.createSession(params)
+    private val sessionParams: PackageInstaller.SessionParams by lazy {
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+        var flags = Refine.unsafeCast<PackageInstallerHidden.SessionParamsHidden>(params).installFlags
+        flags = flags or PackageManagerHidden.INSTALL_ALLOW_TEST or PackageManagerHidden.INSTALL_REPLACE_EXISTING
+        Refine.unsafeCast<PackageInstallerHidden.SessionParamsHidden>(params).installFlags = flags
+        params
+    }
+
+    private fun createPackageInstallerSession(): PackageInstaller.Session {
+        val sessionId = packageInstaller.createSession(sessionParams)
         val iSession = IPackageInstallerSession.Stub.asInterface(iPackageInstaller.openSession(sessionId).asShizukuBinder())
         return Refine.unsafeCast(PackageInstallerHidden.SessionHidden(iSession))
     }
 
     /**
-     * Install a list of APKs using their URIs without asking user.
+     * Install a list of APK splits (AAB) using their URIs without asking user.
      * The permission must have already been checked!
-     * @param pretendToBeAGooglePlayStore Pretend to be a Play Store (root access is not needed)
+     * @param packageToPretendToBe pretend to be the provided package installer (root access is not needed)
      */
-    suspend fun installAPKs(apkURIs: List<String>, pretendToBeAGooglePlayStore: Boolean = false): Int {
-        pretendToBeAPlayStore = pretendToBeAGooglePlayStore
+    suspend fun installAPKs(apkURIs: List<String>, packageToPretendToBe: String = ""): Int {
+        isRoot = Shizuku.getUid() == 0
+        this.packageToPretendToBe = packageToPretendToBe
         var status = PackageInstaller.STATUS_FAILURE
         withContext(Dispatchers.IO) {
             runCatching {
-                val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-                var flags = Refine.unsafeCast<PackageInstallerHidden.SessionParamsHidden>(params).installFlags
-                flags = flags or PackageManagerHidden.INSTALL_ALLOW_TEST or PackageManagerHidden.INSTALL_REPLACE_EXISTING
-                Refine.unsafeCast<PackageInstallerHidden.SessionParamsHidden>(params).installFlags = flags
-                createPackageInstallerSession(params).use { session ->
+                createPackageInstallerSession().use { session ->
                     apkURIs.forEachIndexed { index, uriString ->
                         val uri = Uri.parse(uriString)
                         val stream = appContext.contentResolver.openInputStream(uri) ?: throw IOException("Cannot open input stream")

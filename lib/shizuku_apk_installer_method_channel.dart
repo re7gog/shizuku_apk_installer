@@ -10,26 +10,27 @@ class MethodChannelShizukuApkInstaller extends ShizukuApkInstallerPlatform {
   final methodChannel = const MethodChannel('shizuku_apk_installer');
 
   @override
-  Future<String?> getPlatformVersion() async {
-    final version = await methodChannel.invokeMethod<String>('getPlatformVersion');
+  Future<int?> getPlatformVersion() async {
+    final version = await methodChannel.invokeMethod<int?>('getPlatformVersion');
     return version;
   }
 
   @override
   Future<String?> checkPermission() async {
-    final permission = await methodChannel.invokeMethod<String>('checkPermission');
+    final permission = await methodChannel.invokeMethod<String?>('checkPermission');
     return permission;
   }
 
   @override
-  Future<bool?> installAPKs(List<String> apkFilesURIs) async {
-    final success = await methodChannel.invokeMethod<bool>('installAPKs', {'apkFilesURIs': apkFilesURIs});
+  Future<int?> installAPKs(List<String> apkFilesURIs, String packageToPretendToBe) async {
+    final success = await methodChannel.invokeMethod<int?>('installAPKs',
+        {'apkFilesURIs': apkFilesURIs, 'packageToPretendToBe': packageToPretendToBe});
     return success;
   }
 
   @override
-  Future<bool?> uninstallPackage(String packageName) async {
-    final success = await methodChannel.invokeMethod<bool>('uninstallPackage', {'packageName': packageName});
+  Future<int?> uninstallPackage(String packageName) async {
+    final success = await methodChannel.invokeMethod<int?>('uninstallPackage', {'packageName': packageName});
     return success;
   }
 }

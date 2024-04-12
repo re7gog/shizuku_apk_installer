@@ -12,12 +12,12 @@ import kotlinx.coroutines.async
 
 class ShizukuApkInstallerPlugin: FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
-    private lateinit var worker: ShizukuWorker
+    private lateinit var worker: ShizukuWizard
     private var job: Job? = null
     private var result: Result? = null
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-        worker = ShizukuWorker(flutterPluginBinding.applicationContext)
+        worker = ShizukuWizard(flutterPluginBinding.applicationContext)
         worker.init()
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "shizuku_apk_installer")
         channel.setMethodCallHandler(this)
@@ -39,20 +39,21 @@ class ShizukuApkInstallerPlugin: FlutterPlugin, MethodCallHandler {
             }
             "installAPKs" -> {
                 val apkFilesURIs: List<String> = call.argument("apkFilesURIs")!!
+                val packageToPretendToBe: String = call.argument("packageToPretendToBe")!!
                 job = CoroutineScope(Dispatchers.Default).async {
-                    val res = worker.installAPKs(apkURIs=apkFilesURIs)
-                    result!!.success(res == 0)
+                    val res = worker.installAPKs(apkFilesURIs, packageToPretendToBe)
+                    result!!.success(res)
                 }
             }
             "uninstallPackage" -> {
                 val packageName: String = call.argument("packageName")!!
                 job = CoroutineScope(Dispatchers.Default).async {
                     val res = worker.uninstallPackage(packageName)
-                    result!!.success(res == 0)
+                    result!!.success(res)
                 }
             }
             "getPlatformVersion" -> {
-                result!!.success(android.os.Build.VERSION.SDK_INT.toString())
+                result!!.success(android.os.Build.VERSION.SDK_INT)
             }
             else -> {
                 result!!.notImplemented()
