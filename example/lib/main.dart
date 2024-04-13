@@ -23,7 +23,6 @@ class _MyAppState extends State<MyApp> {
   final _installerPackageNameCtrl = TextEditingController();
   String _uninstallRes = 'Not uninstalled yet';
   final _uninstallPackageNameCtrl = TextEditingController();
-  final _shizukuApkInstallerPlugin = ShizukuApkInstaller();
 
   @override
   void initState() {
@@ -37,7 +36,7 @@ class _MyAppState extends State<MyApp> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     // We also handle the message potentially returning null.
     try {
-      platformVersion = (await _shizukuApkInstallerPlugin.getPlatformVersion())?.toString() ?? 'Failed to get platform version.';
+      platformVersion = (await ShizukuApkInstaller.getPlatformVersion())?.toString() ?? 'Failed to get platform version.';
     } on PlatformException {
       platformVersion = 'Failed to get platform version.';
     }
@@ -56,7 +55,7 @@ class _MyAppState extends State<MyApp> {
     String permission;
     try {
       permission =
-          await _shizukuApkInstallerPlugin.checkPermission() ?? 'Unknown permission state';
+          await ShizukuApkInstaller.checkPermission() ?? 'Unknown permission state';
     } on PlatformException {
       permission = 'Failed to get permission state.';
     }
@@ -72,7 +71,7 @@ class _MyAppState extends State<MyApp> {
     if (result != null) {
       String fileURI = result.paths.map((path) => 'file://${path!}').toList().first;
       String packageInstaller = _installerPackageNameCtrl.text;
-      int? resInt = await _shizukuApkInstallerPlugin.installAPK(fileURI, packageInstaller);
+      int? resInt = await ShizukuApkInstaller.installAPK(fileURI, packageInstaller);
       String res = resInt! == 0 ? "Success" : "Fail";
       setState(() {
         _installRes = res;
@@ -85,7 +84,7 @@ class _MyAppState extends State<MyApp> {
   Future<void> uninstallPackage() async {
     String text = _uninstallPackageNameCtrl.text;
     if (text != "") {
-      int? resInt = await _shizukuApkInstallerPlugin.uninstallPackage(text);
+      int? resInt = await ShizukuApkInstaller.uninstallPackage(text);
       String res = resInt! == 0 ? "Success" : "Fail";
       setState(() {
         _uninstallRes = res;

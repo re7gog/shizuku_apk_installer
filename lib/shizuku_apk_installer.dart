@@ -3,7 +3,7 @@ import 'shizuku_apk_installer_platform_interface.dart';
 class ShizukuApkInstaller {
   /// Returns current android platform version id.
   /// Can be useful if you want to hide this plugin options in old android versions.
-  Future<int?> getPlatformVersion() {
+  static Future<int?> getPlatformVersion() {
     return ShizukuApkInstallerPlatform.instance.getPlatformVersion();
   }
 
@@ -15,24 +15,24 @@ class ShizukuApkInstaller {
   /// "granted_root" - Permission granted with root access
   /// "denied" - Permission denied by user
   /// "old_android_with_adb" - Unsupported, Shizuku running on Android < 8.1 with ADB, user must update Android or use root method
-  Future<String?> checkPermission() {
+  static Future<String?> checkPermission() {
     return ShizukuApkInstallerPlatform.instance.checkPermission();
   }
 
   /// Install APK by its URI without asking user
   /// [packageToPretendToBe] - Set "installed by ..." package property
-  Future<int?> installAPK(String apkFileURI, packageToPretendToBe) {
+  static Future<int?> installAPK(String apkFileURI, packageToPretendToBe) {
     return ShizukuApkInstallerPlatform.instance.installAPKs([apkFileURI], packageToPretendToBe);
   }
 
   /// Install list of AAB splits of one app by their URIs without asking user
   /// [packageToPretendToBe] - Set "installed by ..." package property
-  Future<int?> installAABsplits(List<String> aabSplitsFilesURIs, packageToPretendToBe) {
+  static Future<int?> installAABsplits(List<String> aabSplitsFilesURIs, packageToPretendToBe) {
     return ShizukuApkInstallerPlatform.instance.installAPKs(aabSplitsFilesURIs, packageToPretendToBe);
   }
 
   /// Uninstall package by its name without asking user
-  Future<int?> uninstallPackage(String packageName) {
+  static Future<int?> uninstallPackage(String packageName) {
     return ShizukuApkInstallerPlatform.instance.uninstallPackage(packageName);
   }
 }
