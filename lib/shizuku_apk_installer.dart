@@ -21,13 +21,13 @@ class ShizukuApkInstaller {
 
   /// Install APK by its URI without asking user
   /// [packageToPretendToBe] - Set "installed by ..." package property
-  static Future<int?> installAPK(String apkFileURI, packageToPretendToBe) {
+  static Future<int?> installAPK(String apkFileURI, String packageToPretendToBe) {
     return ShizukuApkInstallerPlatform.instance.installAPKs([apkFileURI], packageToPretendToBe);
   }
 
   /// Install list of AAB splits of one app by their URIs without asking user
   /// [packageToPretendToBe] - Set "installed by ..." package property
-  static Future<int?> installAABsplits(List<String> aabSplitsFilesURIs, packageToPretendToBe) {
+  static Future<int?> installAABsplits(List<String> aabSplitsFilesURIs, String packageToPretendToBe) {
     return ShizukuApkInstallerPlatform.instance.installAPKs(aabSplitsFilesURIs, packageToPretendToBe);
   }
 
