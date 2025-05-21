@@ -126,16 +126,24 @@ class ShizukuWizard(private val appContext: Context) {
         }
     }
 
-    private val sessionParams: PackageInstaller.SessionParams by lazy {
-        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-        var flags = Refine.unsafeCast<PackageInstallerHidden.SessionParamsHidden>(params).installFlags
-        flags = flags or PackageManagerHidden.INSTALL_ALLOW_TEST or PackageManagerHidden.INSTALL_REPLACE_EXISTING
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            flags = flags or PackageManagerHidden.INSTALL_BYPASS_LOW_TARGET_SDK_BLOCK
+private val sessionParams: PackageInstaller.SessionParams by lazy {
+    val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+    var flags = Refine.unsafeCast<PackageInstallerHidden.SessionParamsHidden>(params).installFlags
+    flags = flags or PackageManagerHidden.INSTALL_ALLOW_TEST or PackageManagerHidden.INSTALL_REPLACE_EXISTING
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        try {
+            val field = PackageManagerHidden::class.java.getField("INSTALL_BYPASS_LOW_TARGET_SDK_BLOCK")
+            // flags = flags or PackageManagerHidden.INSTALL_BYPASS_LOW_TARGET_SDK_BLOCK
+            flags = flags or (field.getInt(null))
+        } catch (e: Exception) {
+            Log.d("shizuku_apk_installer", "INSTALL_BYPASS_LOW_TARGET_SDK_BLOCK not available: ${e.message}")
         }
-        Refine.unsafeCast<PackageInstallerHidden.SessionParamsHidden>(params).installFlags = flags
-        params
     }
+
+    Refine.unsafeCast<PackageInstallerHidden.SessionParamsHidden>(params).installFlags = flags
+    params
+}
 
     private fun createPackageInstallerSession(): PackageInstaller.Session {
         val sessionId = packageInstaller.createSession(sessionParams)
