@@ -1,24 +1,24 @@
 buildscript {
-    ext.kotlin_version = '1.8.0'
+    ext.kotlin_version = "2.1.0"
     repositories {
         google()
         mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.3.0'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath("com.android.tools.build:gradle:8.7.3")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
     }
 }
 
 plugins {
-    id "com.android.library"
-    id "kotlin-android"
-    id "dev.rikka.tools.refine" version "4.4.0"
+    id('com.android.library')
+    id('kotlin-android')
+    id('dev.rikka.tools.refine') version '4.4.0'
 }
 
-group 'dev.re7gog.shizuku_apk_installer'
-version '1.0-SNAPSHOT'
+group = "dev.re7gog.shizuku_apk_installer"
+version = "1.0-SNAPSHOT"
 
 allprojects {
     repositories {
@@ -28,38 +28,50 @@ allprojects {
 }
 
 android {
-    if (project.android.hasProperty("namespace")) {
-        namespace 'dev.re7gog.shizuku_apk_installer'
-    }
+    namespace = "dev.re7gog.shizuku_apk_installer"
 
-    compileSdk 34
+    compileSdk = 35
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = JavaVersion.VERSION_11
     }
 
     sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
-        test.java.srcDirs += 'src/test/kotlin'
+        main.java.srcDirs += "src/main/kotlin"
+        test.java.srcDirs += "src/test/kotlin"
     }
 
     defaultConfig {
-        consumerProguardFiles 'consumer-rules.pro'
-        minSdkVersion 24
+        consumerProguardFiles("consumer-rules.pro")
+        minSdk = 24
     }
 
     dependencies {
-        def versionShizuku = "13.1.5"
-        implementation "dev.rikka.shizuku:api:${versionShizuku}"
-        implementation "dev.rikka.shizuku:provider:${versionShizuku}"
+        testImplementation("org.jetbrains.kotlin:kotlin-test")
+        testImplementation("org.mockito:mockito-core:5.0.0")
 
-        implementation "dev.rikka.tools.refine:runtime:4.4.0"
-        compileOnly    "dev.rikka.hidden:stub:4.3.2"
-        implementation "org.lsposed.hiddenapibypass:hiddenapibypass:4.3"
+        implementation("dev.rikka.shizuku:api:13.1.5")
+        implementation("dev.rikka.shizuku:provider:13.1.5")
+
+        implementation("dev.rikka.tools.refine:runtime:4.4.0")
+        compileOnly("dev.rikka.hidden:stub:4.3.2")
+        implementation("org.lsposed.hiddenapibypass:hiddenapibypass:4.3")
+    }
+
+    testOptions {
+        unitTests.all {
+            useJUnitPlatform()
+
+            testLogging {
+                events "passed", "skipped", "failed", "standardOut", "standardError"
+                outputs.upToDateWhen {false}
+                showStandardStreams = true
+            }
+        }
     }
 }
