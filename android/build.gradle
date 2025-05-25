@@ -52,26 +52,12 @@ android {
     }
 
     dependencies {
-        testImplementation("org.jetbrains.kotlin:kotlin-test")
-        testImplementation("org.mockito:mockito-core:5.0.0")
-
         implementation("dev.rikka.shizuku:api:13.1.5")
         implementation("dev.rikka.shizuku:provider:13.1.5")
+        implementation("io.github.iamr0s:Dhizuku-API:2.5.3")
 
         implementation("dev.rikka.tools.refine:runtime:4.4.0")
         compileOnly("dev.rikka.hidden:stub:4.3.2")
         implementation("org.lsposed.hiddenapibypass:hiddenapibypass:4.3")
-    }
-
-    testOptions {
-        unitTests.all {
-            useJUnitPlatform()
-
-            testLogging {
-                events "passed", "skipped", "failed", "standardOut", "standardError"
-                outputs.upToDateWhen {false}
-                showStandardStreams = true
-            }
-        }
     }
 }

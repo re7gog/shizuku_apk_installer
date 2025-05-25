@@ -18,7 +18,6 @@ class ShizukuApkInstallerPlugin: FlutterPlugin, MethodCallHandler {
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         worker = ShizukuWizard(flutterPluginBinding.applicationContext)
-        worker.init()
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "shizuku_apk_installer")
         channel.setMethodCallHandler(this)
     }
