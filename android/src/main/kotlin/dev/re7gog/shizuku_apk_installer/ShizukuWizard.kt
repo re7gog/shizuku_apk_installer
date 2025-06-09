@@ -194,7 +194,7 @@ class ShizukuWizard(private val appContext: Context) {
         flags = flags or PackageManagerHidden.INSTALL_ALLOW_TEST or PackageManagerHidden.INSTALL_REPLACE_EXISTING
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            flags = flags or 0x01000000 // PackageManagerHidden.INSTALL_BYPASS_LOW_TARGET_SDK_BLOCK
+            flags = flags or PackageManagerHidden.INSTALL_BYPASS_LOW_TARGET_SDK_BLOCK
         }
 
         Refine.unsafeCast<PackageInstallerHidden.SessionParamsHidden>(params).installFlags = flags
