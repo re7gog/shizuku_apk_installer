@@ -171,13 +171,19 @@ class ShizukuWorker(private val appContext: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             Refine.unsafeCast(PackageInstallerHidden(
                 iPackageInstaller, installerPackageName, appContext.attributionTag, userId))
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
+        } else {
             Refine.unsafeCast(
                 PackageInstallerHidden(iPackageInstaller, installerPackageName, userId))
-        } else {
+        }
+        /*
+        DEPRECATED
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+        ...
+        else {
             Refine.unsafeCast(PackageInstallerHidden(
                 appContext, appContext.packageManager, iPackageInstaller, installerPackageName, userId))
         }
+        */
     }
 
     private val packageInstallerD: PackageInstaller by lazy {
@@ -186,12 +192,9 @@ class ShizukuWorker(private val appContext: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             Refine.unsafeCast(PackageInstallerHidden(
                 iPackageInstallerD, installerPackageName, contextD.attributionTag, userId))
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
+        } else {
             Refine.unsafeCast(
                 PackageInstallerHidden(iPackageInstallerD, installerPackageName, userId))
-        } else {
-            Refine.unsafeCast(PackageInstallerHidden(
-                contextD, contextD.packageManager, iPackageInstallerD, installerPackageName, userId))
         }
     }
 
