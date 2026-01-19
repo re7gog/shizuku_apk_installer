@@ -22,15 +22,25 @@ class MethodChannelShizukuApkInstaller extends ShizukuApkInstallerPlatform {
   }
 
   @override
-  Future<int?> installAPKs(List<String> apkFilesURIs, String packageToPretendToBe) async {
-    final success = await methodChannel.invokeMethod<int?>('installAPKs',
-        {'apkFilesURIs': apkFilesURIs, 'packageToPretendToBe': packageToPretendToBe});
+  Future<int?> installAPKs(List<String> apkFilesURIs, String fakeInstallSource) async {
+    final success = await methodChannel.invokeMethod<int?>(
+        'installAPKs',
+        {
+          'apkFilesURIs': apkFilesURIs,
+          'fakeInstallSource': fakeInstallSource
+        }
+    );
     return success;
   }
 
   @override
   Future<int?> uninstallPackage(String packageName) async {
-    final success = await methodChannel.invokeMethod<int?>('uninstallPackage', {'packageName': packageName});
+    final success = await methodChannel.invokeMethod<int?>(
+        'uninstallPackage',
+        {
+          'packageName': packageName
+        }
+    );
     return success;
   }
 }

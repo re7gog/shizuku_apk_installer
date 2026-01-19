@@ -39,16 +39,13 @@ import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
-/**
- * Casting unsafe spells 🧙‍♂️🔮
- */
-class ShizukuWizard(private val appContext: Context) {
+class ShizukuWorker(private val appContext: Context) {
     private var isBinderAvailable = false
-    private val requestPermissionCode = 1945
+    private val requestPermissionCode = (1000..2000).random()
     private val requestPermissionMutex by lazy { Mutex(locked = true) }
     private var permissionGranted = false
     private var isRoot = false
-    private var packageToPretendToBe = ""
+    private var fakeInstallSource = ""
 
     private var dInitSucceeded = false
     private val dRequestPermissionMutex by lazy { Mutex(locked = true) }
@@ -65,9 +62,10 @@ class ShizukuWizard(private val appContext: Context) {
         }
 
     private val contextD by lazy {
-        appContext.createPackageContext(Dhizuku.getOwnerComponent().packageName, Context.CONTEXT_IGNORE_SECURITY)
+        appContext.createPackageContext(
+            Dhizuku.getOwnerComponent().packageName, Context.CONTEXT_IGNORE_SECURITY
+        )
     }
-
 
     init {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
@@ -96,7 +94,7 @@ class ShizukuWizard(private val appContext: Context) {
         return if (Shizuku.isPreV11()) {
             "old_shizuku"
         } else if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
-            if (!registerUidObserverPermissionLimitedCheck()){
+            if (!registerUidObserverPermissionLimitedCheck()) {
                 "granted_" + if (isRoot) "root" else "adb"
             } else "old_android_with_adb"
         } else if (Shizuku.shouldShowRequestPermissionRationale()) {  // "Deny and don't ask again"
@@ -105,7 +103,7 @@ class ShizukuWizard(private val appContext: Context) {
             Shizuku.requestPermission(requestPermissionCode)
             requestPermissionMutex.lock()
             if (!registerUidObserverPermissionLimitedCheck()) {
-                if (permissionGranted){
+                if (permissionGranted) {
                     "granted_" + if (isRoot) "root" else "adb"
                 } else "denied"
             } else "old_android_with_adb"
@@ -114,10 +112,10 @@ class ShizukuWizard(private val appContext: Context) {
 
     suspend fun checkPermission(): String {
         return if (!isBinderAvailable and !dInitSucceeded) {
-            "binder_not_found"
+            "services_not_found"
         } else if (dInitSucceeded) {
             if (Dhizuku.isPermissionGranted())
-                "granted_adb"
+                "granted_owner"
             else {
                 Dhizuku.requestPermission(object : DhizukuRequestPermissionListener() {
                     @Throws(RemoteException::class)
@@ -128,7 +126,7 @@ class ShizukuWizard(private val appContext: Context) {
                 })
                 dRequestPermissionMutex.lock()
                 if (dPermissionGranted)
-                    "granted_adb"
+                    "granted_owner"
                 else if (isBinderAvailable)
                     checkShizukuPermission()
                 else
@@ -138,14 +136,15 @@ class ShizukuWizard(private val appContext: Context) {
     }
 
     /**
-     * Android 8.0 with ADB lacks IActivityManager#registerUidObserver permission, so we can't install apps without activity
+     * Android 8.0 with ADB lacks IActivityManager#registerUidObserver permission,
+     * so we can't install apps without activity
      */
     private fun registerUidObserverPermissionLimitedCheck(): Boolean {
         isRoot = Shizuku.getUid() == 0
         return !isRoot and (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1)
     }
 
-    // Thanks to https://github.com/LSPosed/LSPatch, https://gitlab.com/AuroraOSS/AuroraStore
+    // Thanks to https://github.com/LSPosed/LSPatch and https://gitlab.com/AuroraOSS/AuroraStore
 
     private fun IBinder.wrap() = ShizukuBinderWrapper(this)
     private fun IInterface.asShizukuBinder() = this.asBinder().wrap()
@@ -154,25 +153,30 @@ class ShizukuWizard(private val appContext: Context) {
     private fun IInterface.asDhizukuBinder() = this.asBinder().dwrap()
 
     private val iPackageInstaller: IPackageInstaller by lazy {
-        val iPackageManager = IPackageManager.Stub.asInterface(SystemServiceHelper.getSystemService("package").wrap())
+        val iPackageManager = IPackageManager.Stub.asInterface(
+            SystemServiceHelper.getSystemService("package").wrap())
         IPackageInstaller.Stub.asInterface(iPackageManager.packageInstaller.asShizukuBinder())
     }
 
     private val iPackageInstallerD: IPackageInstaller by lazy {
-        val iPackageManager = IPackageManager.Stub.asInterface(SystemServiceHelper.getSystemService("package").dwrap())
+        val iPackageManager = IPackageManager.Stub.asInterface(
+            SystemServiceHelper.getSystemService("package").dwrap())
         IPackageInstaller.Stub.asInterface(iPackageManager.packageInstaller.asDhizukuBinder())
     }
 
     private val packageInstaller: PackageInstaller by lazy {
-        val installerPackageName = if (packageToPretendToBe == "")
-            appContext.packageName else packageToPretendToBe
+        val installerPackageName = if (fakeInstallSource == "")
+            appContext.packageName else fakeInstallSource
         val userId = if (!isRoot) Process.myUserHandle().hashCode() else 0
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Refine.unsafeCast(PackageInstallerHidden(iPackageInstaller, installerPackageName, appContext.attributionTag, userId))
+            Refine.unsafeCast(PackageInstallerHidden(
+                iPackageInstaller, installerPackageName, appContext.attributionTag, userId))
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
-            Refine.unsafeCast(PackageInstallerHidden(iPackageInstaller, installerPackageName, userId))
+            Refine.unsafeCast(
+                PackageInstallerHidden(iPackageInstaller, installerPackageName, userId))
         } else {
-            Refine.unsafeCast(PackageInstallerHidden(appContext, appContext.packageManager, iPackageInstaller, installerPackageName, userId))
+            Refine.unsafeCast(PackageInstallerHidden(
+                appContext, appContext.packageManager, iPackageInstaller, installerPackageName, userId))
         }
     }
 
@@ -180,19 +184,22 @@ class ShizukuWizard(private val appContext: Context) {
         val installerPackageName = DhizukuVariables.OFFICIAL_PACKAGE_NAME
         val userId = Os.getuid() / 100000
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Refine.unsafeCast(PackageInstallerHidden(iPackageInstallerD, installerPackageName, contextD.attributionTag, userId))
+            Refine.unsafeCast(PackageInstallerHidden(
+                iPackageInstallerD, installerPackageName, contextD.attributionTag, userId))
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
-            Refine.unsafeCast(PackageInstallerHidden(iPackageInstallerD, installerPackageName, userId))
+            Refine.unsafeCast(
+                PackageInstallerHidden(iPackageInstallerD, installerPackageName, userId))
         } else {
-            Refine.unsafeCast(PackageInstallerHidden(contextD, contextD.packageManager, iPackageInstallerD, installerPackageName, userId))
+            Refine.unsafeCast(PackageInstallerHidden(
+                contextD, contextD.packageManager, iPackageInstallerD, installerPackageName, userId))
         }
     }
 
     private val sessionParams: PackageInstaller.SessionParams by lazy {
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
         var flags = Refine.unsafeCast<PackageInstallerHidden.SessionParamsHidden>(params).installFlags
-        flags = flags or PackageManagerHidden.INSTALL_ALLOW_TEST or PackageManagerHidden.INSTALL_REPLACE_EXISTING
 
+        flags = flags or PackageManagerHidden.INSTALL_ALLOW_TEST or PackageManagerHidden.INSTALL_REPLACE_EXISTING
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             flags = flags or 0x01000000 // PackageManagerHidden.INSTALL_BYPASS_LOW_TARGET_SDK_BLOCK
         }
@@ -203,13 +210,15 @@ class ShizukuWizard(private val appContext: Context) {
 
     private fun createPackageInstallerSession(): PackageInstaller.Session {
         val sessionId = packageInstaller.createSession(sessionParams)
-        val iSession = IPackageInstallerSession.Stub.asInterface(iPackageInstaller.openSession(sessionId).asShizukuBinder())
+        val iSession = IPackageInstallerSession.Stub.asInterface(
+            iPackageInstaller.openSession(sessionId).asShizukuBinder())
         return Refine.unsafeCast(PackageInstallerHidden.SessionHidden(iSession))
     }
 
     private fun createPackageInstallerSessionD(): PackageInstaller.Session {
         val sessionId = packageInstallerD.createSession(sessionParams)
-        val iSession = IPackageInstallerSession.Stub.asInterface(iPackageInstallerD.openSession(sessionId).asDhizukuBinder())
+        val iSession = IPackageInstallerSession.Stub.asInterface(
+            iPackageInstallerD.openSession(sessionId).asDhizukuBinder())
         return Refine.unsafeCast(PackageInstallerHidden.SessionHidden(iSession))
     }
 
@@ -221,13 +230,13 @@ class ShizukuWizard(private val appContext: Context) {
     }
 
     /**
-     * Install a list of APK splits (AAB) using their URIs without asking user.
+     * Install a list of APK splits (AAB) using their URIs.
      * The permission must have already been checked!
-     * @param packageToPretendToBe pretend to be the provided package installer (root access is not needed)
+     * @param fakeInstallSource set install source app package name
      */
-    suspend fun installAPKs(apkURIs: List<String>, packageToPretendToBe: String = ""): Int {
+    suspend fun installAPKs(apkURIs: List<String>, fakeInstallSource: String = ""): Int {
         if (!dInitSucceeded) isRoot = Shizuku.getUid() == 0
-        this.packageToPretendToBe = packageToPretendToBe
+        this.fakeInstallSource = fakeInstallSource
         var status = PackageInstaller.STATUS_FAILURE
         withContext(Dispatchers.IO) {
             runCatching {
@@ -239,9 +248,9 @@ class ShizukuWizard(private val appContext: Context) {
                         else
                             appContext.contentResolver.openInputStream(uri)) ?: throw IOException("Cannot open input stream")
                         stream.use {
-                            session.openWrite("$index.apk", 0, stream.available().toLong()).use { output ->
-                                stream.copyTo(output)
-                                session.fsync(output)
+                            session.openWrite("$index.apk", 0, stream.available().toLong()).use {
+                                stream.copyTo(it)
+                                session.fsync(it)
                             }
                         }
                     }
@@ -255,8 +264,10 @@ class ShizukuWizard(private val appContext: Context) {
                         session.commit(intentSender)
                     }
                     result?.let {
-                        status = it.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
-                        val message = it.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "No message"
+                        status = it.getIntExtra(
+                            PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+                        val message = it.getStringExtra(
+                            PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "No message"
                         Log.i("shizuku_apk_installer", "Package installer result: $message")
                     } ?: throw IOException("Intent is null")
                 }
@@ -291,8 +302,10 @@ class ShizukuWizard(private val appContext: Context) {
                         packageInstaller.uninstall(packageName, intentSender)
                 }
                 result?.let {
-                    status = it.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
-                    val message = it.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "No message"
+                    status = it.getIntExtra(
+                        PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+                    val message = it.getStringExtra(
+                        PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "No message"
                     Log.i("shizuku_apk_installer", "Package uninstaller result: $message")
                 } ?: throw IOException("Intent is null")
             }.onFailure {
@@ -303,7 +316,6 @@ class ShizukuWizard(private val appContext: Context) {
         return status
     }
 }
-
 
 object IntentSenderHelper {
     fun newIntentSender(binder: IIntentSender): IntentSender {
